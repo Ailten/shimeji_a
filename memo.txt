@@ -1,0 +1,14 @@
+
+. .venv/bin/activate    # activate environement.
+
+python3 main.py  # launch it.
+
+
+pip install PySide6    # lib for shimeji (render management).
+
+ctrl+shift+P  ->  Python: Select Interpreter  --> *select .venv environement*  // for set VSCode on the environement library.
+
+
+
+// split (dedouble shimeji) on rare event.
+// anime walk sprite.
