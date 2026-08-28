@@ -25,4 +25,4 @@ update_loop = threading.Thread(target=updateLoopAsync, daemon=True)
 update_loop.start()
 
 
-sys.exit(app.exec())  # block programme, (try with asyncio ?)
+sys.exit(app.exec())  # block programme.
