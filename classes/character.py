@@ -1,16 +1,21 @@
 
 from PySide6.QtWidgets import QLabel
 from PySide6.QtCore import Qt, QPoint
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QTransform
 from PySide6.QtWidgets import QApplication
 
 from pathlib import Path
+from time import sleep
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from PySide6.QtGui import QMouseEvent
 
+from .characterAction import CharacterAction
+
 class Character(QLabel):
+    is_over_menu_bar: bool = True
+    menu_bar_height: int = 33
 
     def __init__(self):
         super().__init__()
@@ -26,6 +31,14 @@ class Character(QLabel):
         # sprites.
         self.sprites: dict[str, QPixmap] = dict()
 
+        # params.
+        self.time_from_lauch = 0
+        self.action = CharacterAction.Wait
+        self.time_from_last_action = 0
+        self.action_package = {'wait_delay': 2}
+        self.is_look_right = True
+        self.pos_float = [0, 0]
+
     # ------>
 
     def loadSprite(self, sprite_path: str):
@@ -35,14 +48,23 @@ class Character(QLabel):
 
         # first sprite load (set sprite print and size).
         if len(self.sprites) == 1:
-            self.setPixmap(pixmap)
+            self.setSprite(sprite_name)
             self.resize(pixmap.size())
 
-    def setSprite(self, sprite_name: str):
+    def setSprite(self, sprite_name: str, is_flip_left:bool|None = None):
+        if is_flip_left == None:
+            is_flip_left = not self.is_look_right
+
         pixmap = self.sprites.get(sprite_name)
-        if pixmap == None:
+        if pixmap == None:  # if sprite not found, use the 'default' one.
+            pixmap = self.sprites.get('default')
+        if pixmap == None:  # still not found the default, return (or throw exception).
             # TODO: log error : sprite not found.
             return
+        
+        if is_flip_left:
+            pixmap = pixmap.transformed(QTransform().scale(-1, 1))
+
         self.setPixmap(pixmap)
 
     def loadSprites(self, sprites: list[str]):
@@ -67,13 +89,17 @@ class Character(QLabel):
     def increasePosY(self, y: int):
         self.increasePos(x=0, y=y)
 
+    def updatePosFromFloat(self):
+        self.setPos(
+            int(self.pos_float[0]),
+            int(self.pos_float[1])
+        )
+
     # ------>
 
     def snapToGround(self):
-        height_screen = self.screen().geometry().height()
-        height = self.size().height()
-        new_pos_y = height_screen - height
-        self.setPosY(new_pos_y)
+        self.setPosY(self.getMaxPosScreenY())
+        self.pos_float = [float(self.x()), float(self.y())]
 
     def snapToCenter(self):
         screen_geo = self.screen().geometry()
@@ -81,6 +107,7 @@ class Character(QLabel):
             screen_geo.width() // 2,
             screen_geo.height() // 2,
         )
+        self.pos_float = [float(self.x()), float(self.y())]
 
     # ------>
 
@@ -89,3 +116,39 @@ class Character(QLabel):
         if event.button() == Qt.RightButton:
             self.close()  # close the tool window.
             QApplication.quit()  # close the process (loop infint).
+
+    # ------>
+
+    async def updateLoop(self):
+
+        sleep_time_update = 1.0 / 30  # 30 fps.
+        
+        while True:
+
+            # cut the loop.
+            app = QApplication.instance()
+            if app is None or app.closingDown():
+                return
+
+            # do the action update.
+            self.action.do(self)
+
+            # wait fps.
+            sleep(sleep_time_update)
+            self.time_from_lauch += sleep_time_update
+
+    # ------>
+
+    def getTimeInAction(self) -> float:
+        return self.time_from_lauch - self.time_from_last_action
+
+    # ------>
+
+    def getMaxPosScreenX(self) -> int:
+        return self.screen().geometry().width() - self.size().width()
+
+    def getMaxPosScreenY(self) -> int:
+        output = self.screen().geometry().height() - self.size().height()
+        if not Character.is_over_menu_bar:
+            output -= Character.menu_bar_height
+        return output
