@@ -6,6 +6,9 @@ from PySide6.QtWidgets import QApplication
 
 from pathlib import Path
 from time import sleep
+import asyncio
+import threading
+import sys
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -16,6 +19,9 @@ from .characterAction import CharacterAction
 class Character(QLabel):
     is_over_menu_bar: bool = True
     menu_bar_height: int = 33
+
+    is_allow_to_duplicate: bool = False  # Need Fixe from spawn QApplication.
+    instances: list["Character"] = []
 
     def __init__(self):
         super().__init__()
@@ -38,6 +44,9 @@ class Character(QLabel):
         self.action_package = {'wait_delay': 2}
         self.is_look_right = True
         self.pos_float = [0, 0]
+
+        # instances static.
+        Character.instances.append(self)
 
     # ------>
 
@@ -114,8 +123,10 @@ class Character(QLabel):
     def mousePressEvent(self, event: "QMouseEvent"):  # main event for mouse (from the library).
 
         if event.button() == Qt.RightButton:
+            Character.instances.remove(self)
             self.close()  # close the tool window.
-            QApplication.quit()  # close the process (loop infint).
+            if len(Character.instances) == 0:
+                QApplication.quit()  # close the process (loop infint).
 
     # ------>
 
@@ -152,3 +163,38 @@ class Character(QLabel):
         if not Character.is_over_menu_bar:
             output -= Character.menu_bar_height
         return output
+    
+    # ------>
+
+    def spawn(self, sprites:list[str]|None=None) -> "Character":
+        new_instance = Character()
+
+        # set sprites.
+        if sprites == None:
+            new_instance.sprites = self.sprites
+        else:
+            new_instance.loadSprites(sprites)
+        
+        # set pos (same as parent).
+        new_instance.move(self.x(), self.y())
+
+        new_instance.show()
+
+        # get app instance (or create it).
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+
+        # async call for launch it.
+        def appExecInstance():
+            asyncio.run(sys.exit(app.exec()))  # FIXME: QApplication::exec: Must be called from the main thread
+        app_exec_instance = threading.Thread(target=appExecInstance, daemon=True)
+        app_exec_instance.start()
+
+        # loop update of new instance.
+        def updateLoopAsync():
+            asyncio.run(new_instance.updateLoop())
+        update_loop = threading.Thread(target=updateLoopAsync, daemon=True)
+        update_loop.start()
+
+        return new_instance

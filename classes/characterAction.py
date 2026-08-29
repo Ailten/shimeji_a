@@ -10,8 +10,9 @@ from time import sleep
 
 class CharacterAction(Enum):
 
-    Wait = 0,
-    Walk = 1
+    Wait = (0, 100)
+    Walk = (1, 100)
+    Duplicate = (3, 10)
 
     def do(self, character: "Character"):
 
@@ -22,11 +23,12 @@ class CharacterAction(Enum):
             case CharacterAction.Wait:
 
                 # keep waiting.
-                if character.getTimeInAction() < character.action_package['wait_delay']:
+                if character.getTimeInAction() < character.action_package.get('wait_delay'):
                     return
                 
                 new_action = CharacterAction.getRandomAction(notActionAllow = {
-                    CharacterAction.Wait
+                    CharacterAction.Wait,
+                    (None if character.is_allow_to_duplicate else CharacterAction.Duplicate)
                 })
                 new_action.setNewAction(character)
                 
@@ -36,22 +38,22 @@ class CharacterAction(Enum):
 
                 # increase walk.
                 character.pos_float[0] += (
-                    character.action_package['speed_walk'] *
-                    (1 if character.action_package['is_walk_right'] else -1)
+                    character.action_package.get('speed_walk') *
+                    (1 if character.action_package.get('is_walk_right') else -1)
                 )
 
                 # reach the end of walk.
                 if (
                     (
-                        character.action_package['is_walk_right'] and 
-                        int(character.pos_float[0]) >= character.action_package['pos_x_to']
+                        character.action_package.get('is_walk_right') and 
+                        int(character.pos_float[0]) >= character.action_package.get('pos_x_to')
                     ) or (
-                        not character.action_package['is_walk_right'] and 
-                        int(character.pos_float[0]) <= character.action_package['pos_x_to']
+                        not character.action_package.get('is_walk_right') and 
+                        int(character.pos_float[0]) <= character.action_package.get('pos_x_to')
                     )
                 ):
-                    character.pos_float[0] = float(character.action_package['pos_x_to'])
-                    character.setPosX(character.action_package['pos_x_to'])  # snap to end walk.
+                    character.pos_float[0] = float(character.action_package.get('pos_x_to'))
+                    character.setPosX(character.action_package.get('pos_x_to'))  # snap to end walk.
 
                     # set new action.
                     new_action = CharacterAction.getRandomAction(notActionAllow = {
@@ -67,6 +69,18 @@ class CharacterAction(Enum):
                 # TODO: set sprite anime walk, based on time.
                 #character.setSprite('default')
 
+            # ------>
+
+            case CharacterAction.Duplicate:
+
+                character.spawn(character.action_package.get('sprites_new_instance'))
+
+                # set new action.
+                new_action = CharacterAction.getRandomAction(notActionAllow = {
+                    CharacterAction.Walk
+                })
+                new_action.setNewAction(character)
+
     # ------>
 
     @staticmethod
@@ -78,7 +92,19 @@ class CharacterAction(Enum):
 
         if notActionAllow != None:
             action_allow -= notActionAllow
-        
+
+        action_allow -= {None}
+
+        l_allow = list(action_allow)
+        max_sum = sum([ e.value[1] for e in l_allow ])
+        rand_val = random.randint(1, max_sum)
+        for e in l_allow:
+            rand_val -= e.value[1]
+            if rand_val > 0:
+                continue
+            return e
+
+        # old vertion (therocally never use).
         return random.choice(list(action_allow))
     
     # ------>
@@ -127,6 +153,15 @@ class CharacterAction(Enum):
                     'distance_walk': distance_walk,
                     'pos_x_from': character.x(),
                     'pos_x_to': character.x() + distance_walk * (1 if is_walk_right else -1)
+                }
+                character.setSprite('default')
+
+            # ------>
+
+            case CharacterAction.Duplicate:
+
+                character.action_package = {
+                    'sprites_new_instance': None  # TODO: choose randomely a list of str sprite.
                 }
                 character.setSprite('default')
 
