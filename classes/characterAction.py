@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
 import random
 from time import sleep
+from math import floor
 
 class CharacterAction(Enum):
 
@@ -66,8 +67,15 @@ class CharacterAction(Enum):
                 # apply walk (float value).
                 character.updatePosFromFloat()
 
-                # TODO: set sprite anime walk, based on time.
-                #character.setSprite('default')
+                # set sprite anime walk, based on time.
+                time_walking = character.getTimeInAction()
+                dellay_cycle_walk = 0.600
+                interpolate_walk = time_walking % dellay_cycle_walk
+                interpolate_walk /= dellay_cycle_walk
+                sprites_walk_anime = ['walk1', 'default', 'walk2', 'default']
+                interpolate_walk *= len(sprites_walk_anime)
+                interpolate_walk = floor(interpolate_walk)
+                character.setSprite(sprites_walk_anime[interpolate_walk])
 
             # ------>
 
